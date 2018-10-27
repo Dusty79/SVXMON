@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-bot_version = '0.030 beta.'
+bot_version = '0.032 beta.'
 import subprocess
 import threading
 import os
@@ -405,7 +405,7 @@ def start(message):
 @bot.message_handler(commands=['help'])
 def help(message):
 	if check_sender(message):
-		main_menu('This bot will help you to control your SvxLink node.\n\nYou can control a bot sending these commands:\n/svx_start - to start SvxLink\n/svx_stop - to stop SvxLink\n/svx_status - to request SvxLink status\n/edit_options - for editing options of a configuration\n/edit_commands - for editing commands\n/settings_status - for viewing of current settings\n/shortcut_status - for viewing of current shortcuts\n/cancel - for canceling of the current operation\n/help - this help\n\nSvxLink supports the commands consisting of characters of "*", "#", "D", "S", "Q", "p" and digits 0-9.')
+		main_menu('This bot will help you to control your SvxLink node.\n\nYou can control a bot sending these commands:\n/svx_start - to start SvxLink\n/svx_stop - to stop SvxLink\n/svx_status - to request SvxLink status\n/settings_status - for viewing of current settings\n/edit_options - for editing options of a configuration\n/edit_commands - for editing commands\n/shortcut_status - for viewing of current shortcuts\n/add_shortcut - for add new shortcut\n/edit_shortcut - for editing current shortcuts\n/del_shortcut - for deleting current shortcuts\n/cancel - for canceling of the current operation\n/help - this help\n\nSvxLink supports the commands consisting of characters of "*", "#", "D", "S", "Q", "p" and digits 0-9.')
 
 @bot.message_handler(commands=['svx_start'])
 def svx_start(message):
