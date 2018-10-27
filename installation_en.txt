@@ -1,0 +1,21 @@
+This product was developed in the environment of Python 2.7. In the environment of Python 3 will not begin to work (will not become yet).
+Also for operation third-party API of a bot Telegram which will be required to be set by means of pip is used.
+
+For installation of pip:
+sudo apt-get install python-pip
+For installation of API telebot:
+sudo pip install pyTelegramBotAPI
+
+It is necessary to visit a bot father of @BotFather and to get the bot.
+Bot father will prompt a token of a new bot.
+It is necessary to ask the ID of @MyTelegramID_bot.
+These data are entered in a script configuration.
+The script needs to be launched instead of SvxLink with the same rights, but without parameters.
+For example, instead of the 
+su -l svxlink -c "/usr/bin/svxlink --daemon"&
+we write a 
+su -l svxlink -c "python /home/pi/SVXMON/svxmon.py"&
+
+In a config of a script to specify a path to svxlink.
+The config is looked for near a script.
+The user on behalf of whom the script is launched shall have the rights for a read and write of the file of a config.
