@@ -351,7 +351,6 @@ def check_sender(msg):
 	if msg.date < botstarttime:
 		return False
 	if msg.chat.id == CHID:
-#		bot.send_message(CHID, 'Authorized attempt to command from:\nID: ' + str(msg.chat.id) + ', ' + format(msg.chat.first_name) + ' ' + format(msg.chat.last_name))
 		return True
 	else:
 		bot.send_message(CHID, ('Unauthorized attempt to command from:\nID: '\
@@ -391,8 +390,9 @@ def main_menu(note):
 	bot.send_message(CHID, note, reply_markup=markup)
 
 def cancel_operation(note):
+	if not note:
+		note = 'Cancel of operation.'
 	bot.send_message(CHID, note)
-#	main_menu('Return to main menu.')
 
 """
 Section of the bot hendlers
@@ -400,19 +400,16 @@ Section of the bot hendlers
 @bot.message_handler(commands=['start'])
 def start(message):
 	if check_sender(message):
-#		bot.send_message(CHID, 'OK, I am ready. :-)\nSend command /help for info.')
 		main_menu('OK, I am ready. :-)\nSend command /help for info.')
 
 @bot.message_handler(commands=['help'])
 def help(message):
 	if check_sender(message):
-#		bot.send_message(CHID, 'This bot will help you to control your SvxLink node.\n\nYou can control a bot sending these commands:\n/svx_start - to start SvxLink\n/svx_stop - to stop SvxLink\n/svx_status - to request SvxLink status\n/edit_options - for editing options of a configuration\n/edit_commands - for editing commands\n/settings_status - for viewing of current settings\n/shortcut_status - for viewing of current shortcuts\n/edit_shedulers - for change of the schedule (in development)\n/shedulers_status - for viewing of the schedule (in development)\n/help - this help\n\nSvxLink supports the commands consisting of characters of "*", "#", "D", "S", "Q", "p" and digits 0-9.')
-		main_menu('This bot will help you to control your SvxLink node.\n\nYou can control a bot sending these commands:\n/svx_start - to start SvxLink\n/svx_stop - to stop SvxLink\n/svx_status - to request SvxLink status\n/edit_options - for editing options of a configuration\n/edit_commands - for editing commands\n/settings_status - for viewing of current settings\n/shortcut_status - for viewing of current shortcuts\n/edit_shedulers - for change of the schedule (in development)\n/shedulers_status - for viewing of the schedule (in development)\n/help - this help\n\nSvxLink supports the commands consisting of characters of "*", "#", "D", "S", "Q", "p" and digits 0-9.')
+		main_menu('This bot will help you to control your SvxLink node.\n\nYou can control a bot sending these commands:\n/svx_start - to start SvxLink\n/svx_stop - to stop SvxLink\n/svx_status - to request SvxLink status\n/edit_options - for editing options of a configuration\n/edit_commands - for editing commands\n/settings_status - for viewing of current settings\n/shortcut_status - for viewing of current shortcuts\n/cancel - for canceling of the current operation\n/help - this help\n\nSvxLink supports the commands consisting of characters of "*", "#", "D", "S", "Q", "p" and digits 0-9.')
 
 @bot.message_handler(commands=['svx_start'])
 def svx_start(message):
 	if check_sender(message):
-#		bot.send_message(CHID, 'The command to start of SvxLink is received.')
 		main_menu('The command to start of SvxLink is received.')
 		if not do_search:
 			svxlink_mon_start()
@@ -422,7 +419,6 @@ def svx_start(message):
 @bot.message_handler(commands=['svx_stop'])
 def svx_stop(message):
 	if check_sender(message):
-#		bot.send_message(CHID, 'The command to stop SvxLink is received.')
 		main_menu('The command to stop SvxLink is received.')
 		if do_search:
 			try:
@@ -439,7 +435,6 @@ def svx_stop(message):
 @bot.message_handler(commands=['svx_status'])
 def svx_status(message):
 	if check_sender(message):
-#		bot.send_message(CHID, 'The command to check state of SvxLink is received.')
 		main_menu('The command to check state of SvxLink is received.')
 		if do_search:
 			global active_module
@@ -498,16 +493,16 @@ def edit_option_val(message):
 							globals()[option] = get_setting(cfg_path, section, option, option_type)
 							bot.send_message(CHID, 'Error:\n' + str(err) + '\nThe previous value is returned:\n' + option + ' = ' + str(previous_value))
 				else:
-					print('Canсel option edit.')
-					bot.send_message(CHID, 'Incorrect option name. Canсel option edit.')
+					print('Cancel option edit.')
+					bot.send_message(CHID, 'Incorrect option name. Cancel option edit.')
 			else:
-				print('Canсel option edit.')
-				bot.send_message(CHID, 'Canсel option edit.')
+				print('Cancel option edit.')
+				bot.send_message(CHID, 'Cancel option edit.')
 		except Exception as err:
-			print('Canсel option edit: \n' + err)
-			bot.send_message(CHID, 'Canсel option edit.')
+			print('Cancel option edit: \n' + err)
+			bot.send_message(CHID, 'Cancel option edit.')
 	else:
-		cancel_operation('Canсel option edit.')
+		cancel_operation('Cancel option edit.')
 	main_menu('Return to main menu.')
 
 @bot.message_handler(commands=['edit_commands'])
@@ -555,16 +550,16 @@ def edit_command_val(message):
 							globals()[option] = get_setting(cfg_path, section, option, option_type)
 							bot.send_message(CHID, 'Error:\n' + str(err) + '\nThe previous value is returned:\n' + option + ' = ' + str(previous_value))
 				else:
-					print('Canсel command edit.')
-					bot.send_message(CHID, 'Incorrect command name. Canсel command edit.')
+					print('Cancel command edit.')
+					bot.send_message(CHID, 'Incorrect command name. Cancel command edit.')
 			else:
-				print('Canсel command edit.')
-				bot.send_message(CHID, 'Incorrect command. Canсel command edit.')
+				print('Cancel command edit.')
+				bot.send_message(CHID, 'Incorrect command. Cancel command edit.')
 		except Exception as err:
-			print('Canсel command edit: \n' + err)
-			bot.send_message(CHID, 'Canсel option edit.')
+			print('Cancel command edit: \n' + err)
+			bot.send_message(CHID, 'Cancel option edit.')
 	else:
-		cancel_operation('Canсel option edit.')
+		cancel_operation('Cancel option edit.')
 	main_menu('Return to main menu.')
 
 @bot.message_handler(commands=['settings_status'])
@@ -652,10 +647,10 @@ def add_shortcut_val(message):
 					print('Error:\n' + str(err))
 					bot.send_message(CHID, 'Error:\n' + str(err))
 		else:
-			print('Canсel shortcut edit.')
-			bot.send_message(CHID, 'Incorrect shortcut. Canсel shortcut edit.')
+			print('Cancel shortcut edit.')
+			bot.send_message(CHID, 'Incorrect shortcut. Cancel shortcut edit.')
 	else:
-		cancel_operation('Canсel shortcut edit.')
+		cancel_operation('Cancel shortcut edit.')
 	main_menu('Return to main menu.')
 
 @bot.message_handler(commands=['edit_shortcut'])
@@ -703,16 +698,16 @@ def edit_shortcut_val(message):
 							globals()[option] = get_setting(cfg_path, section, option, option_type)
 							bot.send_message(CHID, 'Error:\n' + str(err) + '\nThe previous value is returned:\n' + option + ' = ' + str(previous_value))
 				else:
-					print('Canсel shortcut edit.')
-					bot.send_message(CHID, 'Incorrect shortcut name. Canсel shortcut edit.')
+					print('Cancel shortcut edit.')
+					bot.send_message(CHID, 'Incorrect shortcut name. Cancel shortcut edit.')
 			else:
-				print('Canсel shortcut edit.')
-				bot.send_message(CHID, 'Incorrect shortcut name. Canсel shortcut edit.')
+				print('Cancel shortcut edit.')
+				bot.send_message(CHID, 'Incorrect shortcut name. Cancel shortcut edit.')
 		except Exception as err:
-			print('Canсel shortcut edit: \n' + err)
-			bot.send_message(CHID, 'Canсel shortcut edit.')
+			print('Cancel shortcut edit: \n' + err)
+			bot.send_message(CHID, 'Cancel shortcut edit.')
 	else:
-		cancel_operation('Canсel shortcut edit.')
+		cancel_operation('Cancel shortcut edit.')
 	main_menu('Return to main menu.')
 
 @bot.message_handler(commands=['del_shortcut'])
@@ -796,8 +791,6 @@ def get_messages(message):
 """
 Program main body section
 """
-
-#bot.send_message(CHID, 'SvxLink monitoring BOT started.\nVersion ' + bot_version)
 
 botstarttime = time.time()
 
