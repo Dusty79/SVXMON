@@ -208,7 +208,7 @@ def svxlink_start():
 			if show_info_messages and error_line == '':
 				for keyword in Info_keywords:
 					if keyword in line:
-						error_line = 'i :' + line
+						error_line = 'i: ' + line
 						svx_mon_alarm(error_line)
 						break
 			if show_extinfo_messages and error_line == '':
