@@ -156,6 +156,7 @@ def svxlink_start():
 			continue
 		line = line.rstrip()
 		if line:
+			print(line)
 			if error_line == '':
 				if 'SvxLink v' in line:
 					error_line = 'SVXLINK STARTED'
@@ -678,7 +679,6 @@ def shortcut_status(message):
 			option_line = '/' + option_line
 			markup.add(types.KeyboardButton('/' + option))
 			options_string = ''.join([options_string, option_line, '\n'])
-		itembtn_add_shortcut = types.KeyboardButton('add new shortcuts')
 		itembtn_add_shortcut = types.KeyboardButton('add new shortcut')
 		itembtn_edit_shortcut = types.KeyboardButton('edit of shortcuts')
 		itembtn_del_shortcut = types.KeyboardButton('delete of shortcuts')
