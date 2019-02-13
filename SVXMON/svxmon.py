@@ -679,6 +679,7 @@ def shortcut_status(message):
 			markup.add(types.KeyboardButton('/' + option))
 			options_string = ''.join([options_string, option_line, '\n'])
 		itembtn_add_shortcut = types.KeyboardButton('add new shortcuts')
+		itembtn_add_shortcut = types.KeyboardButton('add new shortcut')
 		itembtn_edit_shortcut = types.KeyboardButton('edit of shortcuts')
 		itembtn_del_shortcut = types.KeyboardButton('delete of shortcuts')
 		itembtn_return = types.KeyboardButton('return to main menu')
@@ -882,7 +883,7 @@ def get_messages(message):
 			edit_commands(message)
 		elif 'viewing of current shortcuts' in message.text:
 			shortcut_status(message)
-		elif 'add new shortcuts' in message.text:
+		elif 'add new shortcut' in message.text:
 			add_shortcut(message)
 		elif 'edit of shortcuts' in message.text:
 			edit_shortcut(message)
