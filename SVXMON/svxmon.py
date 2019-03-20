@@ -1,11 +1,6 @@
 # -*- coding: utf-8 -*-
-bot_version = '0.034 beta.'
-import subprocess
-import threading
-import os
-import sys
-import time
-import re
+bot_version = '0.036 beta.'
+import subprocess, threading, os, sys, time, re
 from sys import argv
 from os.path import abspath, dirname
 import telebot
@@ -14,7 +9,33 @@ try:
 	import configparser
 except ImportError:
 	import ConfigParser as configparser
+try:
+	from queue import Queue, Empty
+except ImportError:
+	from Queue import Queue, Empty
 
+"""
+Variables
+"""
+TX_ON_message = 'Turning the transmitter ON'
+TX_OFF_message = 'Turning the transmitter OFF'
+COS_ON_message = 'The squelch is OPEN'
+COS_OFF_message = 'The squelch is CLOSED'
+Alarm_keywords = ['ERROR', 'WARNING', 'Error', 'timed out']
+Info_keywords = ['Connecting to', 'Connection established to', 'Disconnected from', 'ctivating', 'CONNECT', 'acro', 'digit']
+Extinfo_keywords = ['onnect', 'odule', 'ogic', 'link', 'uthentic', 'node']
+allow_char = r'[^\*#0-9DSQp]'
+allow_shortcut_char = r'[^\_a-z0-9]'
+
+do_search = False
+active_module = ''
+active_logic_list = []
+active_link_list = []
+dialog_is_running = False
+tmp_option_name = ''
+
+lock = threading.Lock()
+trxqueue = Queue()
 
 """
 Section of functions of the configuration file
@@ -88,29 +109,10 @@ with_tx_unstuck = get_setting(cfg_path, 'Commands', 'with_tx_unstuck', 'str')
 with_rx_stuck = get_setting(cfg_path, 'Commands', 'with_rx_stuck', 'str')
 with_rx_unstuck = get_setting(cfg_path, 'Commands', 'with_rx_unstuck', 'str')
 
-TX_ON_message = 'Turning the transmitter ON'
-TX_OFF_message = 'Turning the transmitter OFF'
-COS_ON_message = 'The squelch is OPEN'
-COS_OFF_message = 'The squelch is CLOSED'
-Alarm_keywords = ['ERROR', 'WARNING', 'Error', 'timed out']
-Info_keywords = ['Connecting to', 'Connection established to', 'Disconnected from', 'ctivating', 'CONNECT', 'acro', 'digit']
-Extinfo_keywords = ['onnect', 'odule', 'ogic', 'link', 'uthentic', 'node']
-allow_char = r'[^\*#0-9DSQp]'
-allow_shortcut_char = r'[^\_a-z0-9]'
-
-tx = dict()
-rx = dict()
-tx_start_time = 0
-rx_start_time = 0
-do_search = False
-active_module = ''
-active_logic_list = []
-active_link_list = []
-dialog_is_running = False
-tmp_option_name = ''
-
+"""
+Telebot variables
+"""
 URL = 'https://api.telegram.org/bot'
-lock = threading.Lock()
 bot = telebot.TeleBot(TOKEN, threaded=False)
 
 """
@@ -119,14 +121,6 @@ Section of functions of the bot
 def svxlink_start():
 	print('SvxLink with monitoring is starting...')
 
-	global tx
-	tx.clear()
-	global rx
-	rx.clear()
-	global tx_start_time
-	tx_start_time = 0
-	global rx_start_time
-	rx_start_time = 0
 	line = ''
 	error_line = ''
 	global do_search
@@ -137,8 +131,9 @@ def svxlink_start():
 
 	global svx_process
 	svx_process = subprocess.Popen(svxpath, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-	stuck_search = threading.Thread(name='stuck_search', target=trx_watchdog)
-	stuck_search.setDaemon(True)
+
+	stuck_search = threading.Thread(name='stuck_search', target=trx_watchdog, args=(trxqueue,))
+	stuck_search.daemon = True
 	stuck_search.start()
 
 	while do_search:
@@ -220,35 +215,7 @@ def svxlink_start():
 						break
 
 			if error_line == '':
-				if TX_ON_message in line:
-					with lock:
-						line_begin = line.split(':', 1)[0]
-						if line_begin not in tx:
-							tx[line_begin]={}
-							tx[line_begin]['stuck'] = False
-						tx[line_begin]['start_time'] = time.time()
-				elif TX_OFF_message in line:
-					with lock:
-						line_begin = line.split(':', 1)[0]
-						if line_begin not in tx:
-							tx[line_begin]={}
-							tx[line_begin]['stuck'] = False
-						tx[line_begin]['start_time'] = 0
-
-				if COS_ON_message in line:
-					with lock:
-						line_begin = line.split(':', 1)[0]
-						if line_begin not in rx:
-							rx[line_begin]={}
-							rx[line_begin]['stuck'] = False
-						rx[line_begin]['start_time'] = time.time()
-				elif COS_OFF_message in line:
-					with lock:
-						line_begin = line.split(':', 1)[0]
-						if line_begin not in rx:
-							rx[line_begin]={}
-							rx[line_begin]['stuck'] = False
-						rx[line_begin]['start_time'] = 0
+				trxqueue.put((line))
 
 		line = ''
 		error_line = ''
@@ -279,38 +246,69 @@ def trx_watchdog_response(wdline, way, type):
 				bot.send_message(CHID, 'The command with RX unstuck is executed:\n' + with_rx_unstuck)
 				svx_command(with_rx_unstuck, False)
 
-def trx_watchdog():
-	global tx
-	global rx
+def trx_watchdog(trxqueue):
+	print('trx_watchdog is starting...')
+	tx = dict()
+	rx = dict()
+	line = ''
 	wdline = ''
 
 	while do_search:
-		time.sleep(10)
+		try:
+			line = trxqueue.get(timeout=1)
+		except Empty:
+			pass
+		else:
+			if line:
+				if TX_ON_message in line:
+					line_begin = line.split(':', 1)[0]
+					if line_begin not in tx:
+						tx[line_begin]={}
+						tx[line_begin]['stuck'] = False
+					tx[line_begin]['start_time'] = time.time()
+				elif TX_OFF_message in line:
+					line_begin = line.split(':', 1)[0]
+					if line_begin not in tx:
+						tx[line_begin]={}
+						tx[line_begin]['stuck'] = False
+					tx[line_begin]['start_time'] = 0
+
+				if COS_ON_message in line:
+					line_begin = line.split(':', 1)[0]
+					if line_begin not in rx:
+						rx[line_begin]={}
+						rx[line_begin]['stuck'] = False
+					rx[line_begin]['start_time'] = time.time()
+				elif COS_OFF_message in line:
+					line_begin = line.split(':', 1)[0]
+					if line_begin not in rx:
+						rx[line_begin]={}
+						rx[line_begin]['stuck'] = False
+					rx[line_begin]['start_time'] = 0
+				line = ''
+				trxqueue.task_done()
+
 		for key in tx:
 			if tx[key]['start_time'] != 0:
 				if (time.time()-tx[key]['start_time']) > tx_stucktout and not tx[key]['stuck']:
-					with lock:
-						tx[key]['stuck'] = True
+					tx[key]['stuck'] = True
 					wdline = 'ALARM:\n' + key + ' IS STUCK!'
 					trx_watchdog_response(wdline, 'tx', 'alarm')
 					continue
 			elif tx[key]['start_time'] == 0 and tx[key]['stuck']:
-				with lock:
-					tx[key]['stuck'] = False
+				tx[key]['stuck'] = False
 				wdline = 'INFO:\n' + key + ' IS UNSTUCK!'
 				trx_watchdog_response(wdline, 'tx', 'dealarm')
 
 		for key in rx:
 			if rx[key]['start_time'] != 0:
 				if (time.time()-rx[key]['start_time']) > rx_stucktout and not rx[key]['stuck']:
-					with lock:
-						rx[key]['stuck'] = True
+					rx[key]['stuck'] = True
 					wdline = 'ALARM:\n' + key + ' IS STUCK!'
 					trx_watchdog_response(wdline, 'rx', 'alarm')
 					continue
 			elif rx[key]['start_time'] == 0 and rx[key]['stuck']:
-				with lock:
-					rx[key]['stuck'] = False
+				rx[key]['stuck'] = False
 				wdline = 'INFO:\n' + key + ' IS UNSTUCK!'
 				trx_watchdog_response(wdline, 'rx', 'dealarm')
 
@@ -506,6 +504,16 @@ def edit_option_name(message):
 		if not ('cancel') in message.text:
 			print('Attempt to change an option: ' + message.text)
 			markup = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
+			section = 'Options'
+			if config.has_option(section, message.text):
+				option_type = str(type(globals()[message.text]))
+				option_type = option_type.strip('<>').split(' ', 1)[1]
+				option_type = option_type.strip("'")
+				if option_type == 'bool':
+					itembtn_true = types.KeyboardButton('True')
+					markup.add(itembtn_true)
+					itembtn_false = types.KeyboardButton('False')
+					markup.add(itembtn_false)
 			itembtn_cancel = types.KeyboardButton('cancel of operation')
 			markup.add(itembtn_cancel)
 			global tmp_option_name
