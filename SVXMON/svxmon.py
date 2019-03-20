@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-bot_version = '0.036 beta.'
+bot_version = '0.38 beta.'
 import subprocess, threading, os, sys, time, re
 from sys import argv
 from os.path import abspath, dirname
@@ -28,6 +28,7 @@ allow_char = r'[^\*#0-9DSQp]'
 allow_shortcut_char = r'[^\_a-z0-9]'
 
 do_search = False
+do_implement = False
 active_module = ''
 active_logic_list = []
 active_link_list = []
@@ -35,6 +36,7 @@ dialog_is_running = False
 tmp_option_name = ''
 
 lock = threading.Lock()
+svx_cmd_queue = Queue()
 trxqueue = Queue()
 
 """
@@ -125,13 +127,13 @@ def svxlink_start():
 	error_line = ''
 	global do_search
 	do_search = True
+	global do_implement
 	global active_module
 	global active_logic_list
 	global active_link_list
 
 	global svx_process
 	svx_process = subprocess.Popen(svxpath, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
 	stuck_search = threading.Thread(name='stuck_search', target=trx_watchdog, args=(trxqueue,))
 	stuck_search.daemon = True
 	stuck_search.start()
@@ -148,6 +150,7 @@ def svxlink_start():
 			active_module = ''
 			active_logic_list = []
 			active_link_list = []
+			do_implement = True
 			continue
 		line = line.rstrip()
 		if line:
@@ -164,6 +167,7 @@ def svxlink_start():
 					active_module = ''
 					active_logic_list = []
 					active_link_list = []
+					do_implement = True
 					continue
 			if 'Activating module' in line:
 				active_module = line.rstrip('...').partition('Activating module ')[-1]
@@ -313,35 +317,53 @@ def trx_watchdog(trxqueue):
 				trx_watchdog_response(wdline, 'rx', 'dealarm')
 
 def svxlink_mon_start():
-	try:
-		global svxmon
-		svxmon = threading.Thread(name='svxmon', target=svxlink_start)
-		svxmon.start()
-	except Exception as err:
-		err = str(err)
-		print('ERROR: ' + err)
-		bot.send_message(CHID, 'Failure attempt of a start SvxLink.\nERROR:\n' + err)
+	if do_implement:
+		try:
+			global svxmon
+			svxmon = threading.Thread(name='svxmon', target=svxlink_start)
+			svxmon.start()
+		except Exception as err:
+			err = str(err)
+			print('ERROR: ' + err)
+			bot.send_message(CHID, 'Failure attempt of a start SvxLink.\nERROR:\n' + err)
+	else:
+		bot.send_message(CHID, 'Failure. SvxLink monitor is busy.\nThe command to start SvxLink is discarded.')
 
 def svx_command(command, confirm):
+	global do_implement
 	if command != '':
 		if check_svx_command(command):
 			if do_search:
 				if confirm:
 					bot.send_message(CHID, 'The command is accepted: ' + command)
-				global svx_process
-				for character in command:
-					if character != 'S':
-						if character == 'p':
-							time.sleep(1)
-						svx_process.stdin.write(character)
+				svx_cmd_queue.put(command)
 			elif command == 'S':
-				bot.send_message(CHID, 'The command to start of SvxLink is received.')
+				bot.send_message(CHID, 'The command to start SvxLink is received.')
 				svxlink_mon_start()
 			else:
 				bot.send_message(CHID, 'Failure. SvxLink is not launched.\nThe message: "' + command + '" - is discarded.')
 		else:
 			print('Invalid command: ' + command)
 			bot.send_message(CHID, 'Invalid command: ' + command)
+
+def svx_command_implement(svx_cmd_queue):
+	global svx_process
+	global do_implement
+	while True:
+		try: command = svx_cmd_queue.get(timeout=1)
+		except Empty:
+			pass
+		else:
+			if do_implement:
+				for character in command:
+					if character != 'S':
+						if character == 'p':
+							time.sleep(1)
+						elif character == 'Q':
+							do_implement = False
+						svx_process.stdin.write(character)
+			else:
+				bot.send_message(CHID, 'Failure. SvxLink monitor is busy.\nThe message: "' + command + '" - is discarded.')
 
 def check_svx_command(command):
 	if re.search(allow_char, command):
@@ -434,7 +456,7 @@ def help(message):
 def svx_start(message):
 	global dialog_is_running
 	if check_sender(message) and not dialog_is_running:
-		main_menu('The command to start of SvxLink is received.')
+		main_menu('The command to start SvxLink is received.')
 		if not do_search:
 			svxlink_mon_start()
 		else:
@@ -915,6 +937,10 @@ botstarttime = time.time()
 
 main_menu('SvxLink monitoring BOT started.\nVersion ' + bot_version)
 
+command_implement = threading.Thread(name='command_implement',target=svx_command_implement, args=(svx_cmd_queue,))
+command_implement.daemon = True
+command_implement.start()
+do_implement = True
 if svxautostart:
 	if not do_search:
 		bot.send_message(CHID, 'Attempt to autostart SvxLink.')
