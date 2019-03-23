@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-bot_version = '0.38 beta.'
+bot_version = '0.40 beta.'
 import subprocess, threading, os, sys, time, re
 from sys import argv
 from os.path import abspath, dirname
@@ -38,6 +38,8 @@ tmp_option_name = ''
 lock = threading.Lock()
 svx_cmd_queue = Queue()
 trxqueue = Queue()
+outqueue = Queue()
+botmodules = dict()
 
 """
 Section of functions of the configuration file
@@ -91,7 +93,8 @@ def delete_setting(path, section, setting):
 """
 Reading values to variables
 """
-cfg_path = dirname(abspath(argv[0])) + '/svxmon_settings.cfg'
+svxmonpath = dirname(abspath(argv[0]))
+cfg_path = svxmonpath + '/svxmon_settings.cfg'
 config = get_config(cfg_path)
 
 TOKEN = get_setting(cfg_path, 'Settings', 'token', 'str')
@@ -110,6 +113,9 @@ with_tx_stuck = get_setting(cfg_path, 'Commands', 'with_tx_stuck', 'str')
 with_tx_unstuck = get_setting(cfg_path, 'Commands', 'with_tx_unstuck', 'str')
 with_rx_stuck = get_setting(cfg_path, 'Commands', 'with_rx_stuck', 'str')
 with_rx_unstuck = get_setting(cfg_path, 'Commands', 'with_rx_unstuck', 'str')
+
+files = os.listdir(svxmonpath + '/Modules')
+scripts = filter(lambda x: x.endswith('.py'), files)
 
 """
 Telebot variables
@@ -422,10 +428,11 @@ def main_menu(note):
 	itembtn_svx_status = types.KeyboardButton('SvxLink status')
 	itembtn_settings_status = types.KeyboardButton('viewing of current settings')
 	itembtn_shortcut_status = types.KeyboardButton('viewing of current shortcuts')
+	itembtn_bot_modules = types.KeyboardButton('bot modules')
 	itembtn_help = types.KeyboardButton('help')
 	markup.row(itembtn_svx_start, itembtn_svx_stop, itembtn_svx_status)
 	markup.row(itembtn_settings_status, itembtn_shortcut_status)
-	markup.row(itembtn_help)
+	markup.row(itembtn_bot_modules, itembtn_help)
 	bot.send_message(CHID, note, reply_markup=markup)
 	print(note)
 
@@ -436,6 +443,23 @@ def operation_result(note):
 	dialog_is_running = False
 	note = '\n'.join([note, 'Return to main menu.'])
 	main_menu(note)
+
+"""
+Section of functions of the additional bot modules
+"""
+def enqueue_output(out, outqueue):
+	for line in iter(out.readline, ''):
+		line = re.sub("\s*\n\s*", ' ', line.strip())# удаляем пробелы в начале и в конце строки и символы переноса строки
+		outqueue.put(line)
+	out.close()
+
+def botmodule_output(outqueue):
+	while True:
+		try: line = outqueue.get(timeout=1)
+		except Empty:
+			pass
+		else:
+			bot.send_message(CHID, line)
 
 """
 Section of the bot hendlers
@@ -450,7 +474,7 @@ def start(message):
 def help(message):
 	global dialog_is_running
 	if check_sender(message) and not dialog_is_running:
-		main_menu('This bot will help you to control your SvxLink node.\n\nYou can control a bot sending these commands:\n/svx_start - to start SvxLink\n/svx_stop - to stop SvxLink\n/svx_status - to request SvxLink status\n/settings_status - for viewing of current settings\n/edit_options - for editing options of a configuration\n/edit_commands - for editing commands\n/shortcut_status - for viewing of current shortcuts\n/add_shortcut - for add new shortcut\n/edit_shortcut - for editing current shortcuts\n/del_shortcut - for deleting current shortcuts\n/cancel - for canceling of the current operation\n/help - this help\n\nSvxLink supports the commands consisting of characters of "*", "#", "D", "S", "Q", "p" and digits 0-9.')
+		main_menu('This bot will help you to control your SvxLink node.\n\nYou can control a bot sending these commands:\n/svx_start - to start SvxLink\n/svx_stop - to stop SvxLink\n/svx_status - to request SvxLink status\n/settings_status - for viewing of current settings\n/edit_options - for editing options of a configuration\n/edit_commands - for editing commands\n/shortcut_status - for viewing of current shortcuts\n/add_shortcut - for add new shortcut\n/edit_shortcut - for editing current shortcuts\n/del_shortcut - for deleting current shortcuts\n/cancel - for canceling of the current operation\n/bot_modules - for work with bot additional modules\n/help - this help\n\nSvxLink supports the commands consisting of characters of "*", "#", "D", "S", "Q", "p" and digits 0-9.')
 
 @bot.message_handler(commands=['svx_start'])
 def svx_start(message):
@@ -884,6 +908,54 @@ def del_shortcut_val(message):
 		else:
 			operation_result('Cancel delete shortcut.')
 
+@bot.message_handler(commands=['bot_modules'])
+def bot_modules(message):
+	global dialog_is_running
+	if check_sender(message) and not dialog_is_running:
+		modules_string = ''
+		markup = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
+		if botmodules.items():
+			for modulename in botmodules:
+				module_line = 'module ' + modulename
+				markup.add(types.KeyboardButton(module_line))
+				modules_string = ''.join([modules_string, modulename, '\n'])
+		itembtn_return = types.KeyboardButton('return to main menu')
+		markup.row(itembtn_return)
+		sent = bot.send_message(CHID, 'Current active additional bot modules:\n\n' + modules_string + '\nFor work with the additional module send keyword "module" and his name.', reply_markup=markup)
+		bot.register_next_step_handler(sent, bot_modules_name)
+		dialog_is_running = True
+
+def bot_modules_name(message):
+	global dialog_is_running
+	if check_sender(message) and dialog_is_running:
+		if not ('return to main menu') in message.text:
+			markup = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
+			itembtn_cancel = types.KeyboardButton('cancel of operation')
+			markup.add(itembtn_cancel)
+			global tmp_option_name
+			tmp_option_name = message.text.split()[1]
+			sent = bot.send_message(CHID, 'Attempt to work with bot module ' + tmp_option_name + '.\nSend instruction for module.', reply_markup=markup)
+			bot.register_next_step_handler(sent, bot_modules_cmd)
+		else:
+			operation_result('Cancel.')
+
+def bot_modules_cmd(message):
+	global dialog_is_running
+	if check_sender(message) and dialog_is_running:
+		if not ('cancel') in message.text:
+			global botmodules
+			global tmp_option_name
+			arg = re.sub("\s*\n\s*", ' ', message.text.strip())
+			try:
+				botmodules[tmp_option_name]['subprocess'].stdin.write(arg+'\n')
+				botmodules[tmp_option_name]['subprocess'].stdin.flush()
+				operation_result('The instruction is sent.')
+			except Exception as err:
+				print('Module error:\n' + str(err))
+				operation_result('Module error:\n' + str(err))
+		else:
+			operation_result('Cancel of operation.')
+
 @bot.message_handler(commands=['cancel'])
 def cancel(message):
 	print('cancel')
@@ -919,6 +991,8 @@ def get_messages(message):
 			edit_shortcut(message)
 		elif 'delete of shortcuts' in message.text:
 			del_shortcut(message)
+		elif 'bot modules' in message.text:
+			bot_modules(message)
 		elif 'return to main menu' in message.text:
 			cancel(message)
 		elif 'cancel of operation' in message.text:
@@ -941,10 +1015,33 @@ command_implement = threading.Thread(name='command_implement',target=svx_command
 command_implement.daemon = True
 command_implement.start()
 do_implement = True
+
 if svxautostart:
 	if not do_search:
 		bot.send_message(CHID, 'Attempt to autostart SvxLink.')
 		svxlink_mon_start()
+
+for script in scripts:
+	try:
+		scriptpath = svxmonpath + '/Modules/'
+		cmd = ['python', str(scriptpath + script)]
+		modulename = script[:-3]
+		print('Module attaching: ' + scriptpath + script)
+		botmodules[modulename]={}
+		botmodules[modulename]['subprocess'] = subprocess.Popen(cmd, shell=False, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1)
+		botmodules[modulename]['thread'] = threading.Thread(target=enqueue_output, args=(botmodules[modulename]['subprocess'].stdout, outqueue))
+		botmodules[modulename]['thread'].daemon = True
+		botmodules[modulename]['thread'].setName(modulename)
+		botmodules[modulename]['thread'].start()
+		print('Starting thread: ' + botmodules[modulename]['thread'].getName())
+
+	except Exception as err:
+		err = str(err)
+		print('ERROR: ' + err)
+
+botmodule_out = threading.Thread(name='botmodule_out', target=botmodule_output, args=(outqueue,))
+botmodule_out.daemon = True
+botmodule_out.start()
 
 #bot.polling()
 
