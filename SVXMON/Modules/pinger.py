@@ -16,6 +16,6 @@ if __name__ == "__main__":
 				print('Ping is done.')
 				sys.stdout.flush()
 			elif outline != '':
-				print('Pinger: \n' + outline)
+				print('Pinger: ' + outline)
 				sys.stdout.flush()
 				outline = ''
